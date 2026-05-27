@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vitalsim"
+version = "0.1.0"
+description = "Bless-based BLE peripheral simulator that streams live vitals for Flutter BLE app testing."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+  { name = "VitalsSim contributors" },
+]
+keywords = [
+  "ble",
+  "bluetooth-low-energy",
+  "flutter",
+  "gatt",
+  "iot",
+  "simulator",
+  "vitals",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Testing",
+  "Topic :: System :: Hardware",
+]
+dependencies = [
+  "bless>=0.2.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-username/vitalsim"
+Issues = "https://github.com/your-username/vitalsim/issues"
+
+[project.scripts]
+vitalsim = "vitalsim.cli:main"
+
+[dependency-groups]
+dev = [
+  "ruff>=0.11.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vitalsim"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
