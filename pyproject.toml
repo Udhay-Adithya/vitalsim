@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "vitalsim"
 version = "0.1.0"
-description = "Bless-based BLE peripheral simulator that streams live vitals for Flutter BLE app testing."
+description = "Bless-based BLE peripheral simulator that streams live vitals for BLE central testing."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -15,7 +15,6 @@ authors = [
 keywords = [
   "ble",
   "bluetooth-low-energy",
-  "flutter",
   "gatt",
   "iot",
   "simulator",

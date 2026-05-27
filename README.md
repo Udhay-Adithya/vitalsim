@@ -1,8 +1,8 @@
 # VitalsSim
 
-VitalsSim is a Python Bluetooth Low Energy peripheral simulator for testing mobile apps that scan, connect, discover GATT services, and subscribe to live vitals notifications.
+VitalsSim is a Python Bluetooth Low Energy peripheral simulator for testing BLE central clients that scan, connect, discover GATT services, and subscribe to live vitals notifications.
 
-It is built on [`bless`](https://github.com/kevincar/bless) and acts as the BLE server/peripheral. Your Flutter app, for example one using `flutter_reactive_ble`, acts as the BLE client/central.
+It is built on [`bless`](https://github.com/kevincar/bless) and acts as the BLE server/peripheral. Any BLE central can consume it, including native mobile apps, desktop tools, web clients with Web Bluetooth support, and test harnesses.
 
 ## Features
 
@@ -46,16 +46,10 @@ uv sync --dev
 
 ## Run
 
-Recommended:
+Recommended on macOS and most developer machines:
 
 ```bash
 uv run vitalsim
-```
-
-Compatibility wrapper:
-
-```bash
-uv run python ble_simulator.py
 ```
 
 On Linux, use `sudo` if your Bluetooth permissions require it:
@@ -91,23 +85,117 @@ uv run vitalsim --verbose
 | Custom Vitals `12345678-1234-1234-1234-123456789abc` | Temperature | `12345678-1234-1234-1234-123456789002` | `uint16` little-endian centidegrees Celsius |
 | Custom Vitals `12345678-1234-1234-1234-123456789abc` | Step Count | `12345678-1234-1234-1234-123456789003` | `uint32` little-endian steps |
 
-See [UUIDS.md](UUIDS.md) for exact Dart decoding snippets for `flutter_reactive_ble`.
+See [UUIDS.md](UUIDS.md) for the full UUID and byte-format reference.
 
-## Flutter Subscription Sketch
+## Client Decode Examples
 
-```dart
-final characteristic = QualifiedCharacteristic(
-  serviceId: Uuid.parse('12345678-1234-1234-1234-123456789abc'),
-  characteristicId: Uuid.parse('12345678-1234-1234-1234-123456789001'),
-  deviceId: deviceId,
-);
+These examples focus on decoding notification payloads after your client has connected and subscribed to the relevant characteristic.
 
-final subscription = flutterReactiveBle
-    .subscribeToCharacteristic(characteristic)
-    .listen((data) {
-  final spo2 = data[0];
-  // Update app state.
-});
+### JavaScript
+
+Useful for Web Bluetooth clients and Node-based BLE clients that expose payloads as `DataView`, `ArrayBuffer`, or `Buffer`.
+
+```js
+function asDataView(value) {
+  if (value instanceof DataView) return value;
+  if (value instanceof ArrayBuffer) return new DataView(value);
+  return new DataView(value.buffer, value.byteOffset, value.byteLength);
+}
+
+function decodeHeartRate(value) {
+  const data = asDataView(value);
+  const flags = data.getUint8(0);
+  return (flags & 0x01) === 0x01 ? data.getUint16(1, true) : data.getUint8(1);
+}
+
+function decodeBattery(value) {
+  return asDataView(value).getUint8(0);
+}
+
+function decodeSpo2(value) {
+  return asDataView(value).getUint8(0);
+}
+
+function decodeTemperatureC(value) {
+  return asDataView(value).getUint16(0, true) / 100;
+}
+
+function decodeSteps(value) {
+  return asDataView(value).getUint32(0, true);
+}
+```
+
+### Swift
+
+Useful for iOS, iPadOS, macOS, watchOS, and other CoreBluetooth clients.
+
+```swift
+import Foundation
+
+func decodeHeartRate(_ data: Data) -> UInt16 {
+    let flags = data[0]
+    if flags & 0x01 == 0x01 {
+        return UInt16(data[1]) | (UInt16(data[2]) << 8)
+    }
+    return UInt16(data[1])
+}
+
+func decodeBattery(_ data: Data) -> UInt8 {
+    data[0]
+}
+
+func decodeSpo2(_ data: Data) -> UInt8 {
+    data[0]
+}
+
+func decodeTemperatureC(_ data: Data) -> Double {
+    let centidegrees = UInt16(data[0]) | (UInt16(data[1]) << 8)
+    return Double(centidegrees) / 100.0
+}
+
+func decodeSteps(_ data: Data) -> UInt32 {
+    UInt32(data[0])
+        | (UInt32(data[1]) << 8)
+        | (UInt32(data[2]) << 16)
+        | (UInt32(data[3]) << 24)
+}
+```
+
+### Kotlin
+
+Useful for Android BLE clients.
+
+```kotlin
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+
+fun decodeHeartRate(bytes: ByteArray): Int {
+    val flags = bytes[0].toInt()
+    return if ((flags and 0x01) == 0x01) {
+        ByteBuffer.wrap(bytes, 1, 2).order(ByteOrder.LITTLE_ENDIAN).short.toInt() and 0xffff
+    } else {
+        bytes[1].toInt() and 0xff
+    }
+}
+
+fun decodeBattery(bytes: ByteArray): Int = bytes[0].toInt() and 0xff
+
+fun decodeSpo2(bytes: ByteArray): Int = bytes[0].toInt() and 0xff
+
+fun decodeTemperatureC(bytes: ByteArray): Double {
+    val centidegrees = ByteBuffer.wrap(bytes, 0, 2)
+        .order(ByteOrder.LITTLE_ENDIAN)
+        .short
+        .toInt() and 0xffff
+    return centidegrees / 100.0
+}
+
+fun decodeSteps(bytes: ByteArray): Long {
+    return ByteBuffer.wrap(bytes, 0, 4)
+        .order(ByteOrder.LITTLE_ENDIAN)
+        .int
+        .toLong() and 0xffffffffL
+}
 ```
 
 ## Development
@@ -115,7 +203,7 @@ final subscription = flutterReactiveBle
 Run tests:
 
 ```bash
-PYTHONPATH=src uv run python -m unittest
+uv run python -m unittest discover -s tests
 ```
 
 Lint:
@@ -134,10 +222,10 @@ uv build
 
 ```text
 .
-├── ble_simulator.py          # Compatibility wrapper
 ├── pyproject.toml            # uv/project metadata and dependencies
 ├── README.md
 ├── UUIDS.md
+├── LICENSE
 ├── src/vitalsim/
 │   ├── cli.py                # argparse and process entry point
 │   ├── simulator.py          # bless server and notify loop
@@ -145,9 +233,10 @@ uv build
 │   ├── constants.py          # GATT UUIDs
 │   └── platform_notes.py
 └── tests/
+    ├── test_simulator.py
     └── test_state.py
 ```
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
